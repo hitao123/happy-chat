@@ -1,8 +1,8 @@
 <template>
   <div class="chat-room">
-    <div v-if="false" class="chat-unlogin">
-      <input  placeholder="请输入昵称" autocomplete="off" />
-      <button>确 定</button>
+    <div v-if="notEnter" class="chat-unlogin">
+      <input class="input" placeholder="请输入昵称" autocomplete="off" v-model="inputName" />
+      <button class="button" @click="handleEnter">确 定</button>
     </div>
     <div v-else class="chat-container">
       <header class="header">
@@ -18,36 +18,17 @@
               <span>3  进入了聊天室</span>
             </p>
             <ul class="message-list">
-              <li class="right clearfix">
-                <img :src="avatar1" />
-                <div>
-                  <span class="name">华海涛</span>
-                  <p>
-                    <span class="content">2</span>
-                  </p>
-                </div>
-              </li>
-
-              <li class="left clearfix">
-                <img :src="avatar1" />
-                <div>
-                  <span class="name">测试人员</span>
-                  <p>
-                    <span class="content">2</span>
-                  </p>
-                </div>
-              </li>
-
-              <li class="left clearfix">
-                <img :src="avatar1" />
-                <div>
-                  <span class="name">华海涛</span>
-                  <p>
-                    <span class="content">2</span>
-                  </p>
-                </div>
-              </li>
-
+              <template v-for="(item, index) in messageList">
+                <li class="clearfix" :class="item.side" :key="index">
+                  <img :src="item.avatar" />
+                  <div>
+                    <span class="name">{{ item.name }}</span>
+                    <p>
+                      <span class="content">{{ item.msg }}</span>
+                    </p>
+                  </div>
+                </li>
+              </template>
             </ul>
           </div>
           <div class="conversation-input">
@@ -57,23 +38,21 @@
               <i class="fa fa-bolt" title="点击页面震动"></i>
               <i class="fa fa-picture-o" title="点击发送图片"></i>
             </div>
-            <textarea class="textarea" placeholder="输入 Enter 发送消息"></textarea>
+            <textarea
+              class="textarea"
+              placeholder="输入 Enter 发送消息"
+              @keyup.enter="handleSendMsg"
+              v-model="message"
+            >
+            </textarea>
           </div>
         </aside>
         <aside class="contacts">
-          <h3>在线人员 ( {{ count }} )</h3>
+          <h3>在线人员 ( {{ onlineUserList.length }} )</h3>
           <ul class="contacts-list">
-            <li>
-              <img :src="avatar1" />
-              <span>32牛</span>
-            </li>
-            <li>
-              <img :src="avatar1" />
-              <span>3</span>
-            </li>
-            <li>
-              <img :src="avatar1" />
-              <span>3</span>
+            <li v-for="(item, index) in onlineUserList" :key="index">
+              <img :src="item.avatar" />
+              <span>{{ item.nickName }}</span>
             </li>
           </ul>
         </aside>
@@ -96,12 +75,77 @@ export default {
   },
   data() {
     return {
-      count: 0,
       chatLogo,
       avatar1,
       avatar2,
       avatar3,
-      avatar4
+      avatar4,
+      notEnter: true,
+      inputName: '',
+      message: '',
+      onlineUserList: [],
+      messageList: []
+    }
+  },
+  mounted() {
+    /* eslint no-console:off */
+    this.$socket.emit('loginUserInfo');
+  },
+  methods: {
+    handleEnter() {
+      if (!this.inputName) {
+        return;
+      }
+
+      this.$socket.emit('login', {
+        nickName: this.inputName,
+        avatar: this.getRandomAvatar()
+      });
+    },
+    getRandomAvatar() {
+      const random = Math.floor(Math.random() * 4) + 1;
+
+      switch (random) {
+        case 1:
+          return avatar1;
+        case 2:
+          return avatar2;
+        case 3:
+          return avatar3;
+        case 4:
+          return avatar4;
+        default:
+          return avatar1;
+      }
+    },
+    handleSendMsg() {
+      if (!this.message) {
+        alert("输入内容不能为空")
+        return;
+      } else {
+        this.$socket.emit('sendMsg', {
+          message: this.message
+        });
+        this.message = '';
+      }
+    }
+  },
+  sockets: {
+    connect() {
+      console.log('socket connected')
+    },
+    loginSuccess() {
+      this.notEnter = false;
+    },
+    userRepeat() {
+      alert('用户名已存在，请重新输入！');
+    },
+    onlineUser(data) {
+      this.onlineUserList = data;
+    },
+    receiveMsg(data) {
+      this.messageList = data;
+      console.log(data, this.messageList.length);
     }
   }
 }
@@ -117,7 +161,42 @@ export default {
   }
 
   .chat-room .chat-unlogin {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 600px;
+    height: 200px;
+    margin: 100px auto;
+    padding: 0 30px;
+    border: 2px #eee solid;
+    border-radius: 10px;
+    box-shadow: 2px 2px 4px #ccc;
+    background-color: #fff;
+  }
 
+  .chat-unlogin .input {
+    display: block;
+    outline: none;
+    height: 30px;
+    width: 100%;
+  }
+
+  .chat-unlogin .button {
+    width: 120px;
+    height: 30px;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    color: #fff;
+    background-color: #1890ff;
+    border-color: #1890ff;
+    text-shadow: 0 -1px 0 rgba(0,0,0,0.12);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.045);
+    cursor: pointer;
+  }
+
+  .chat-unlogin .button:focus {
+    outline: 0;
   }
 
   .chat-room .chat-container {
@@ -249,7 +328,7 @@ export default {
   .contacts-list li {
     display: inline-block;
     width: 70px;
-    height: 65px;
+    height: 90px;
     vertical-align: middle;
     text-align: center;
   }
