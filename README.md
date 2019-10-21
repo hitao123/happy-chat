@@ -15,3 +15,5 @@
 > cd client
 > npm run serve
 ```
+
+[inspired by chat](https://github.com/windlany/happy-chat)

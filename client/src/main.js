@@ -3,6 +3,8 @@ import VueSocketIO from 'vue-socket.io'
 import App from './App.vue'
 import store from './store'
 
+import './assets/font-awesome-4.7.0/css/font-awesome.min.css'
+
 Vue.config.productionTip = false
 
 Vue.use(new VueSocketIO({
