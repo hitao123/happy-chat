@@ -101,8 +101,10 @@ export default {
     }
   },
   mounted() {
-    /* eslint no-console:off */
-    this.$socket.emit('loginUserInfo');
+    window.addEventListener('beforeunload', e => this.beforeunloadFn(e))
+  },
+  destroyed() {
+    window.removeEventListener('beforeunload', e => this.beforeunloadFn(e));
   },
   methods: {
     handleEnter() {
@@ -166,10 +168,15 @@ export default {
         color: this.color,
         type: 'img'
       });
+    },
+    beforeunloadFn(e) {
+      const event = window.event || e;
+      event.returnValue = ("确定离开当前页面吗？");
     }
   },
   sockets: {
     connect() {
+      /* eslint no-console:off */
       console.log('socket connected')
     },
     loginSuccess() {
