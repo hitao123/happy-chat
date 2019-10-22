@@ -1,10 +1,15 @@
 <template>
   <div class="chat-room">
     <div v-if="notEnter" class="chat-unlogin">
-      <input class="input" placeholder="请输入昵称" autocomplete="off" v-model="inputName" />
+      <input class="input"
+        placeholder="请输入昵称"
+        autocomplete="off"
+        v-model="inputName"
+        @keyup.enter="handleEnter"
+      />
       <button class="button" @click="handleEnter">确 定</button>
     </div>
-    <div v-else class="chat-container">
+    <div v-else class="chat-container" :class="shake ? 'shaking-animation' : ''">
       <header class="header">
         <img :src="chatLogo" />
         <h3>聊天室</h3>
@@ -12,10 +17,10 @@
       <main class="main">
         <aside class="conversation">
           <div class="conversation-content">
-            <p class="system">
-              <span>15:00:18</span>
+            <p class="system" v-for="(item, index) in enterAndLeaveList" :key="index">
+              <span>{{ item.time }}</span>
               <br>
-              <span>3  进入了聊天室</span>
+              <span>{{ item.name }} {{ item.status }}了聊天室</span>
             </p>
             <ul class="message-list">
               <template v-for="(item, index) in messageList">
@@ -23,8 +28,9 @@
                   <img :src="item.avatar" />
                   <div>
                     <span class="name">{{ item.name }}</span>
-                    <p>
-                      <span class="content">{{ item.msg }}</span>
+                    <p :style="{color: item.color}">
+                      <img v-if="item.type === 'img'" :src="item.msg" class="chat-img" />
+                      <span v-else class="content">{{ item.msg }}</span>
                     </p>
                   </div>
                 </li>
@@ -33,10 +39,16 @@
           </div>
           <div class="conversation-input">
             <div class="edit">
-              <i class="fa fa-font" title="自定义字体颜色"></i>
-              <i class="fa fa-smile-o" title="双击取消选择"></i>
-              <i class="fa fa-bolt" title="点击页面震动"></i>
-              <i class="fa fa-picture-o" title="点击发送图片"></i>
+              <label for="color">
+                <i class="fa fa-font" title="自定义字体颜色"></i>
+              </label>
+              <input class="hidden" type="color" id="color" @change="handleColorChoose" />
+              <!-- <i class="fa fa-smile-o" title="双击取消选择" @click="handleEmojiChoose"></i> -->
+              <i class="fa fa-bolt" title="点击页面震动" @click="handleShake"></i>
+              <label for="file">
+                <i class="fa fa-picture-o" title="点击发送图片"></i>
+              </label>
+              <input class="hidden" type="file" id="file" @change="handleImage" accept="image/*" />
             </div>
             <textarea
               class="textarea"
@@ -70,9 +82,6 @@ import avatar4 from '../assets/image/avatar4.jpg';
 
 export default {
   name: 'chatRoom',
-  props: {
-    msg: String
-  },
   data() {
     return {
       chatLogo,
@@ -84,7 +93,11 @@ export default {
       inputName: '',
       message: '',
       onlineUserList: [],
-      messageList: []
+      messageList: [],
+      enterAndLeaveList: [],
+      color: '#000',
+      shake: false,
+      timer: null
     }
   },
   mounted() {
@@ -93,7 +106,7 @@ export default {
   },
   methods: {
     handleEnter() {
-      if (!this.inputName) {
+      if (!this.inputName.trim()) {
         return;
       }
 
@@ -119,15 +132,40 @@ export default {
       }
     },
     handleSendMsg() {
-      if (!this.message) {
+      if (!this.message.trim()) {
         alert("输入内容不能为空")
         return;
       } else {
         this.$socket.emit('sendMsg', {
-          message: this.message
+          msg: this.message,
+          color: this.color,
+          type: 'text'
         });
         this.message = '';
       }
+    },
+    handleColorChoose(e) {
+      this.color = e.target.value || '#000';
+    },
+    handleEmojiChoose() {
+      //
+    },
+    handleShake() {
+      this.$socket.emit('shake');
+      this.shake = true;
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => {
+        this.shake = false;
+      }, 500);
+    },
+    handleImage(e) {
+      const file = e.target.files[0];
+      const img = window.URL.createObjectURL(file);
+      this.$socket.emit('sendMsg', {
+        msg: img,
+        color: this.color,
+        type: 'img'
+      });
     }
   },
   sockets: {
@@ -144,8 +182,17 @@ export default {
       this.onlineUserList = data;
     },
     receiveMsg(data) {
-      this.messageList = data;
-      console.log(data, this.messageList.length);
+      this.messageList.push(data);
+      // const messageNode = document.querySelector(".message-list");
+      // this.$nextTick(() => {
+      //   messageNode.scrollTop = messageNode.scrollHeight;
+      // });
+    },
+    enterAndLeft(data) {
+      this.enterAndLeaveList.push(data);
+    },
+    shake(data) {
+      this.enterAndLeaveList.push(data);
     }
   }
 }
@@ -275,15 +322,17 @@ export default {
 
   .right img, .right div {
     float: right;
+    text-align: right;
   }
 
   .left img, .left div {
     float: left;
+    text-align: left;
   }
 
   .message-list div > p {
     display: flex;
-    max-width: 300px;
+    max-width: 310px;
     height: auto;
     padding: 10px;
     margin-top: 5px;
@@ -291,6 +340,17 @@ export default {
     font-size: 14px;
     border-radius: 5px;
     background-color: #86bdf8;
+  }
+
+  .message-list div > p .chat-img {
+    margin: 0;
+    padding: 0;
+    max-width: 300px;
+    max-height: 188px;
+    width: auto;
+    height: auto;
+    border-radius: 5px;
+    vertical-align: bottom;
   }
 
   .conversation .conversation-input {
@@ -312,7 +372,7 @@ export default {
   }
 
   .conversation-input .edit {
-    width: 100%;   
+    width: 100%;
     height: 25px;
     text-align: left;
   }
@@ -336,6 +396,31 @@ export default {
   .contacts-list li img {
     width: 100%;
     height: 60px;
+  }
+
+  .hidden {
+    width: 0;
+    height: 0;
+    visibility: hidden;
+  }
+
+  .shaking-animation {
+    animation: shake 0.2s infinite;
+  }
+
+  @keyframes shake {
+    0% {
+        left: 0;
+    }
+    25% {
+        left: -7px;
+    }
+    50% {
+        left: 7px;
+    }
+    100% {
+        left: 0;
+    }
   }
 
 </style>

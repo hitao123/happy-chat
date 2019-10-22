@@ -31,7 +31,7 @@ app.all('*', function(req, res, next) {
  * socket.broadcast.emit(foo); //触发除了当前用户的其他用户的foo事件
  */
 io.on('connect', (socket) => {
-
+    const time = new Date().toTimeString().substr(0, 8);
     // 获取登录用户信息
     socket.on('login', (user) => {
         if (users.indexOf(user.nickName) > -1) {
@@ -43,6 +43,7 @@ io.on('connect', (socket) => {
             socket.nickName = user.nickName; // 将当前连接用户存储起来
 
             io.emit('enterAndLeft', {
+                time,
                 name: user.nickName,
                 status: '进入'
             });
@@ -58,46 +59,70 @@ io.on('connect', (socket) => {
      * 后台收到任意一条消息，已广播的方式传播出去
      */
     socket.on('sendMsg', (data) => {
-        console.log(data);
+
         const index = users.indexOf(socket.nickName);
         const avatar = usersInfo[index].avatar;
 
         // 其他人显示
         socket.broadcast.emit('receiveMsg', {
             name: socket.nickName,
-            avatar,
-            msg: data.messsge,
+            avatar: avatar,
+            msg: data.msg,
+            type: data.type,
+            color: data.color,
             side: 'left'
         });
 
         // 自己消息显示，主要是为了区分左右两边，好做样式处理
         socket.emit('receiveMsg', {
             name: socket.nickName,
-            avatar,
-            msg: data.messsge,
+            avatar: avatar,
+            msg: data.msg,
+            type: data.type,
+            color: data.color,
             side: 'right'
         });
     });
+
+    /**
+     * 发送窗口抖动
+     */
+    socket.on('shake', (data) => {
+      const time = new Date().toTimeString().substr(0, 8);
+
+      socket.broadcast.emit('shake', {
+          name: socket.nickName,
+          status: '抖动',
+          time
+      });
+
+      socket.emit('shake', {
+          name: '你',
+          status: '抖动',
+          time
+      });
+    });
+
+    socket.on('disconnect', () => {
+        const time = new Date().toTimeString().substr(0, 8);
+        const index = users.indexOf(socket.nickName);
+
+        if (index > -1) {
+            users.splice(index, 1);
+            usersInfo.splice(index, 1);
+
+            io.emit('enterAndLeft', {
+                name: socket.nickName,
+                status: '离开',
+                time
+            });
+
+            io.emit('onlineUser', usersInfo);
+        }
+
+    });
 });
 
-
-io.on('disconnect', (socket) => {
-
-    const index = users.indexOf(socket.nickName);
-
-    if (index > -1) {
-        users.splice(index, 1);
-        usersInfo.splice(index, 1);
-
-        io.emit('enterAndLeft', {
-            name: user.nickName,
-            status: '离开'
-        });
-
-        io.emit('onlineUser', usersInfo);
-    }
-
-});
 
 
 
